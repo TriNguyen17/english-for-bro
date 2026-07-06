@@ -12,7 +12,7 @@ export default function Home() {
   const [vocabList, setVocabList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- 🌟 STATE QUẢN LÝ CHỦ ĐỀ (THƯ MỤC) 🌟 ---
+  // --- STATE QUẢN LÝ CHỦ ĐỀ (THƯ MỤC) ---
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
   // --- STATE TABS NAVIGATION ---
@@ -57,10 +57,10 @@ export default function Home() {
     setLoading(false);
   }, []);
 
-  // 🌟 TRÍCH XUẤT DANH SÁCH CÁC CHỦ ĐỀ DUY NHẤT ĐANG CÓ TRONG KHO TỪ VỰNG 🌟
+  // Trích xuất danh sách các chủ đề duy nhất đang có trong kho từ vựng
   const uniqueTopics = Array.from(new Set(vocabList.map(item => item.topic || 'Chủ đề chung')));
 
-  // 🌟 LỌC DANH SÁCH TỪ VỰNG THEO CHỦ ĐỀ ĐƯỢC CHỌN 🌟
+  // Lọc danh sách từ vựng theo chủ đề được chọn
   const filteredVocab = vocabList.filter(item => (item.topic || 'Chủ đề chung') === selectedTopic);
 
   const currentVocab = filteredVocab[currentIndex];
@@ -136,6 +136,23 @@ export default function Home() {
     }
   };
 
+  // 🌟 ĐÃ BỔ SUNG 2 HÀM LỖI CLICK CHUỘT NỐI TỪ VÀO ĐÂY 🌟
+  const handleEnCardClick = (id: number) => {
+    if (matchedIds.includes(id) || isMatchError) return;
+    setSelectedEn(id);
+    if (selectedVi !== null) {
+      checkMatch(id, selectedVi);
+    }
+  };
+
+  const handleViCardClick = (id: number) => {
+    if (matchedIds.includes(id) || isMatchError) return;
+    setSelectedVi(id);
+    if (selectedEn !== null) {
+      checkMatch(selectedEn, id);
+    }
+  };
+
   const checkMatch = (enId: number, viId: number) => {
     if (enId === viId) {
       const newMatched = [...matchedIds, enId];
@@ -191,15 +208,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ================= 🌟 MAN HÌNH 1: CHƯA CHỌN CHỦ ĐỀ (HIỂN THỊ THƯ MỤC) 🌟 ================= */}
+      {/* MÀN HÌNH CHƯA CHỌN CHỦ ĐỀ */}
       {!selectedTopic ? (
-        <div className="w-full max-w-2xl flex-1 flex flex-col items-center justify-center py-6 animate-fade-in">
+        <div className="w-full max-w-2xl flex-1 flex flex-col items-center justify-center py-6">
           <h2 className="text-2xl font-black mb-2 text-center text-amber-400">📚 Đấu Trường Từ Vựng</h2>
           <p className="text-slate-400 text-sm mb-8 text-center">Hãy chọn một thư mục chủ đề bên dưới để bắt đầu luyện game!</p>
           
           <div className="grid grid-cols-2 gap-4 w-full px-2">
             {uniqueTopics.map((topicName, index) => {
-              // Đếm số từ trong chủ đề này
               const count = vocabList.filter(item => (item.topic || 'Chủ đề chung') === topicName).length;
               return (
                 <button
@@ -218,10 +234,9 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        // ================= MÀN HÌNH 2: ĐÃ CHỌN CHỦ ĐỀ (HIỂN THỊ GAME THEO TAB) =================
-        <div className="w-full max-w-2xl flex-1 flex flex-col items-center justify-center px-2 animate-fade-in">
+        // MÀN HÌNH ĐÃ CHỌN CHỦ ĐỀ
+        <div className="w-full max-w-2xl flex-1 flex flex-col items-center justify-center px-2">
           
-          {/* Tiêu đề chủ đề hiện tại */}
           <div className="text-center mb-4">
             <span className="text-xs font-bold uppercase text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
               Chủ đề: {selectedTopic}
@@ -240,7 +255,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* HỌC FLASHCARD */}
+          {/* FLASHCARD */}
           {activeTab === 'flashcard' && filteredVocab.length > 0 && (
             <div className="w-full max-w-md flex flex-col items-center">
               <div onClick={() => setIsFlipped(!isFlipped)} className="w-full h-80 cursor-pointer [perspective:1000px] mb-6">
@@ -262,7 +277,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* BÀI TẬP TRẮC NGHIỆM */}
+          {/* TRẮC NGHIỆM */}
           {activeTab === 'quiz' && filteredVocab.length > 0 && (
             <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
               <div className="text-center mb-6">
@@ -279,7 +294,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* GAME ĐIỀN TỪ CHÍNH TẢ */}
+          {/* ĐIỀN TỪ */}
           {activeTab === 'typing' && filteredVocab.length > 0 && (
             <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl flex flex-col items-center">
               <h3 className="text-2xl font-black text-white mb-6 text-center">"{currentVocab?.meaning}"</h3>
@@ -299,7 +314,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* GAME NỐI TỪ THEO CHỦ ĐỀ */}
+          {/* NỐI TỪ */}
           {activeTab === 'matching' && filteredVocab.length > 0 && (
             <div className="w-full bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
               <div className="text-center mb-6">
@@ -330,7 +345,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* SỔ TAY TỪ KHÓ (HIỂN THỊ TỔNG HỢP TOÀN BỘ) */}
+          {/* SỔ TAY TỪ KHÓ */}
           {activeTab === 'notebook' && (
             <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
               <h3 className="text-lg font-black text-red-400 mb-2 flex items-center gap-2">📕 Sổ Tay Từ Khó ({difficultWordIds.length})</h3>
@@ -363,7 +378,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 🌟 THANH ĐIỀU HƯỚNG ĐÁY (CHỈ HIỆN KHI ĐÃ VÀO THƯ MỤC CHỦ ĐỀ) 🌟 */}
+      {/* MENUBAR ĐÁY */}
       {selectedTopic && (
         <div className="fixed bottom-0 left-0 right-0 bg-slate-850/95 border-t border-slate-800 backdrop-blur-md py-3 px-2 flex justify-around items-center z-50 max-w-2xl mx-auto md:rounded-t-2xl md:bottom-4 md:border shadow-2xl">
           <button onClick={() => setActiveTab('flashcard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'flashcard' ? 'text-blue-500 scale-105 font-bold' : 'text-slate-400'}`}>
