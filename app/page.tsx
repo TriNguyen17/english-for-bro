@@ -12,15 +12,15 @@ export default function Home() {
   const [vocabList, setVocabList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- STATE TABS NAVIGATION ---
+  const [activeTab, setActiveTab] = useState<'flashcard' | 'quiz' | 'typing' | 'matching' | 'notebook'>('flashcard');
+  
   // --- STATE QUẢN LÝ CHUNG ---
-  const [mode, setMode] = useState<'flashcard' | 'quiz' | 'typing' | 'mistakes'>('flashcard');
   const [xp, setXp] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // --- STATE DANH SÁCH TỪ KHÓ (MISTAKES) ---
   const [difficultWordIds, setDifficultWordIds] = useState<number[]>([]);
 
-  // --- STATE PHỤ CHO CÁC GAME ---
+  // --- STATE CHO CÁC GAME ---
   const [isFlipped, setIsFlipped] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
@@ -28,7 +28,15 @@ export default function Home() {
   const [isTypingCorrect, setIsTypingCorrect] = useState<boolean | null>(null);
   const [showHint, setShowHint] = useState(false);
 
-  // 1. TẢI TOÀN BỘ DỮ LIỆU TỪ LOCALSTORAGE KHI VÀO WEB
+  // --- STATE GAME NỐI TỪ ---
+  const [enCards, setEnCards] = useState<{ id: number; word: string }[]>([]);
+  const [viCards, setViCards] = useState<{ id: number; meaning: string }[]>([]);
+  const [selectedEn, setSelectedEn] = useState<number | null>(null);
+  const [selectedVi, setSelectedVi] = useState<number | null>(null);
+  const [matchedIds, setMatchedIds] = useState<number[]>([]);
+  const [isMatchError, setIsMatchError] = useState(false);
+
+  // Tải dữ liệu ban đầu
   useEffect(() => {
     const savedList = localStorage.getItem('english_vocab_list');
     if (savedList) setVocabList(JSON.parse(savedList));
@@ -40,36 +48,35 @@ export default function Home() {
     const savedXp = localStorage.getItem('english_app_xp');
     if (savedXp) setXp(parseInt(savedXp));
 
-    // Tải danh sách ID các từ làm sai từ trước (nếu có)
     const savedDifficults = localStorage.getItem('english_difficult_ids');
     if (savedDifficults) setDifficultWordIds(JSON.parse(savedDifficults));
     
     setLoading(false);
   }, []);
 
-  // 2. LỌC DANH SÁCH TỪ VỰNG DỰA TRÊN CHẾ ĐỘ HỌC
-  // Nếu ở chế độ 'mistakes', chỉ lấy những từ có ID nằm trong danh sách đen
-  const activeList = mode === 'mistakes' 
-    ? vocabList.filter(item => difficultWordIds.includes(item.id))
-    : vocabList;
-
-  const currentVocab = activeList[currentIndex];
-  const progressPercentage = activeList.length > 0 ? (currentIndex / activeList.length) * 100 : 0;
-
-  // Tự động dọn dẹp ô nhập liệu khi đổi từ
+  // Khởi tạo bàn cờ nối từ
   useEffect(() => {
-    setTypedWord('');
-    setIsTypingCorrect(null);
-    setShowHint(false);
-    setIsFlipped(false);
-  }, [currentIndex, mode]);
+    if (activeTab === 'matching' && vocabList.length > 0) {
+      const sampleWords = vocabList.slice(0, 5);
+      setEnCards([...sampleWords].map(item => ({ id: item.id, word: item.word })).sort(() => Math.random() - 0.5));
+      setViCards([...sampleWords].map(item => ({ id: item.id, meaning: item.meaning })).sort(() => Math.random() - 0.5));
+      setSelectedEn(null); setSelectedVi(null); setMatchedIds([]); setIsMatchError(false);
+    }
+  }, [activeTab, vocabList]);
 
-  // Tự động nhảy về từ đầu tiên nếu danh sách ôn tập bị thay đổi độ dài
+  // Tự động dọn dẹp form khi chuyển từ vựng hoặc đổi Tab
+  useEffect(() => {
+    setTypedWord(''); setIsTypingCorrect(null); setShowHint(false); setIsFlipped(false);
+  }, [currentIndex, activeTab]);
+
   useEffect(() => {
     setCurrentIndex(0);
-  }, [mode]);
+  }, [activeTab]);
 
-  // 3. LOGIC HỘP TỪ KHÓ (THÊM / XÓA KHỎI DANH SÁCH ĐEN)
+  const currentVocab = vocabList[currentIndex];
+  const progressPercentage = vocabList.length > 0 ? (currentIndex / vocabList.length) * 100 : 0;
+
+  // Hộp từ khó
   const addToDifficultWords = (id: number) => {
     if (!difficultWordIds.includes(id)) {
       const newList = [...difficultWordIds, id];
@@ -78,11 +85,10 @@ export default function Home() {
     }
   };
 
-  const removeFromDifficultWords = (id: number) => {
+  const removeDifficultWordDirectly = (id: number) => {
     const newList = difficultWordIds.filter(wordId => wordId !== id);
     setDifficultWordIds(newList);
     localStorage.setItem('english_difficult_ids', JSON.stringify(newList));
-    alert('✨ Xuất sắc! Từ này đã được xóa khỏi danh sách từ khó!');
   };
 
   const updateXp = (amount: number) => {
@@ -93,14 +99,9 @@ export default function Home() {
     });
   };
 
-  // 4. XỬ LÝ KẾT QUẢ CÁC BÀI HỌC
   const handleFlashcardAnswer = (isLearned: boolean) => {
-    if (isLearned) {
-      updateXp(10);
-      if (mode === 'mistakes') removeFromDifficultWords(currentVocab.id);
-    } else {
-      addToDifficultWords(currentVocab.id); // Ghi sớ táo quân nếu chọn chưa thuộc
-    }
+    if (isLearned) updateXp(10);
+    else addToDifficultWords(currentVocab.id);
     nextWord();
   };
 
@@ -109,14 +110,8 @@ export default function Home() {
     setSelectedAnswer(option);
     const correct = option === currentVocab.meaning;
     setIsCorrect(correct);
-
-    if (correct) {
-      updateXp(15);
-      if (mode === 'mistakes') removeFromDifficultWords(currentVocab.id);
-    } else {
-      addToDifficultWords(currentVocab.id); // Chọn sai trắc nghiệm -> phạt vào hộp từ khó
-    }
-
+    if (correct) updateXp(15);
+    else addToDifficultWords(currentVocab.id);
     setTimeout(() => { setSelectedAnswer(null); setIsCorrect(null); nextWord(); }, 1200);
   };
 
@@ -125,24 +120,35 @@ export default function Home() {
     if (!typedWord.trim()) return;
     const isRight = typedWord.trim().toLowerCase() === currentVocab.word.trim().toLowerCase();
     setIsTypingCorrect(isRight);
-
     if (isRight) {
       updateXp(20);
-      if (mode === 'mistakes') removeFromDifficultWords(currentVocab.id);
       setTimeout(() => nextWord(), 1200);
     } else {
-      addToDifficultWords(currentVocab.id); // Gõ sai chính tả -> phạt tiếp
+      addToDifficultWords(currentVocab.id);
       setTimeout(() => setIsTypingCorrect(null), 1500);
     }
   };
 
-  const nextWord = () => {
-    if (currentIndex < activeList.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
+  const checkMatch = (enId: number, viId: number) => {
+    if (enId === viId) {
+      const newMatched = [...matchedIds, enId];
+      setMatchedIds(newMatched); setSelectedEn(null); setSelectedVi(null); updateXp(5);
+      if (newMatched.length === Math.min(vocabList.length, 5)) {
+        setTimeout(() => {
+          alert('🎉 Tuyệt vời! Em đã nối chính xác toàn bộ!');
+          updateXp(15);
+          setActiveTab('flashcard');
+        }, 500);
+      }
     } else {
-      alert(`🎉 Hoàn thành lượt học này rồi!`);
-      setCurrentIndex(0);
+      setIsMatchError(true); addToDifficultWords(enId);
+      setTimeout(() => { setSelectedEn(null); setSelectedVi(null); setIsMatchError(false); }, 800);
     }
+  };
+
+  const nextWord = () => {
+    if (currentIndex < vocabList.length - 1) setCurrentIndex((prev) => prev + 1);
+    else { alert(`🎉 Hoàn thành lượt học! Tiếp tục cày game nào!`); setCurrentIndex(0); }
   };
 
   const speakWord = (e: React.MouseEvent, text: string) => {
@@ -152,181 +158,195 @@ export default function Home() {
     window.speechSynthesis.speak(utterance);
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center font-bold">Đang tải vũ trụ từ vựng...</div>;
-  if (vocabList.length === 0) return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center gap-4">
-      <p className="text-slate-400 italic">Kho từ vựng trống, hãy bảo anh/chị vào Admin thêm từ nhé!</p>
-      <Link href="/admin" className="bg-blue-600 px-6 py-3 rounded-xl font-bold">⚙️ Vào trang Admin</Link>
-    </div>
-  );
+  if (loading) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center font-bold">Đang tải đấu trường...</div>;
 
   return (
-    <main className="min-h-screen bg-slate-900 text-white p-6 font-sans flex flex-col items-center">
+    <main className="min-h-screen bg-slate-900 text-white p-4 font-sans flex flex-col items-center justify-between pb-28 md:pb-6">
       
-      {/* NÚT ADMIN */}
-      <div className="w-full max-w-6xl flex justify-end mb-4">
-        <Link href="/admin" className="bg-slate-800 hover:bg-slate-700 text-xs font-bold px-4 py-2 rounded-xl border border-slate-700 text-slate-300 transition-all">
-          ⚙️ Cài đặt từ vựng (Cho Anh/Chị)
+      {/* HEADER */}
+      <div className="w-full max-w-2xl flex justify-between items-center mb-6 bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 shadow-lg">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💎</span>
+          <div>
+            <span className="text-xl font-black text-amber-400">{xp} XP</span>
+            <span className="text-[10px] text-slate-400 block">Thành tích của em</span>
+          </div>
+        </div>
+        <Link href="/admin" className="bg-slate-700 hover:bg-slate-600 text-[11px] font-bold px-3 py-2 rounded-xl border border-slate-600 text-slate-200 transition-all">
+          ⚙️ Quản lý từ (Cho Anh/Chị)
         </Link>
       </div>
 
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      {/* KHU VỰC CHỨA NỘI DUNG FORM GAME */}
+      <div className="w-full max-w-2xl flex-1 flex flex-col items-center justify-center px-2">
         
-        {/* ================= CỘT TRÁI: KHU VỰC CHƠI GAME ================= */}
-        <div className="lg:col-span-2 flex flex-col items-center bg-slate-800/40 border border-slate-800 p-6 rounded-3xl backdrop-blur-sm">
-          
-          {/* NAV ĐỔI CHẾ ĐỘ HỌC */}
-          <div className="flex bg-slate-800 p-1 rounded-xl mb-6 border border-slate-700 shadow-md flex-wrap gap-1 justify-center">
-            <button onClick={() => setMode('flashcard')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === 'flashcard' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>📇 Flashcard</button>
-            <button onClick={() => setMode('quiz')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === 'quiz' ? 'bg-orange-600 text-white' : 'text-slate-400'}`}>🎮 Trắc Nghiệm</button>
-            <button onClick={() => setMode('typing')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${mode === 'typing' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}>⌨️ Điền Từ</button>
-            
-            {/* Nút Hộp từ khó (Chỉ nổi bật khi có từ sai) */}
-            <button 
-              onClick={() => {
-                if (difficultWordIds.length === 0) {
-                  alert('🎉 Tuyệt vời! Hiện tại em không có từ khó nào cần ôn tập cả. Hãy tiếp tục giữ vững phong độ nhé!');
-                  return;
-                }
-                setMode('mistakes');
-              }} 
-              className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-1.5
-                ${mode === 'mistakes' ? 'bg-red-600 text-white shadow-lg shadow-red-900/30' : 'text-red-400 hover:bg-red-500/10'}`}
-            >
-              🔥 Ôn Từ Khó ({difficultWordIds.length})
-            </button>
+        {activeTab !== 'matching' && activeTab !== 'notebook' && (
+          <div className="w-full max-w-md mb-6">
+            <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+              <span>Tiến độ vòng này</span>
+              <span>{currentIndex}/{vocabList.length} từ</span>
+            </div>
+            <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div className="h-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
+            </div>
           </div>
+        )}
 
-          {/* TIẾN ĐỘ VÒNG HỌC */}
-          {activeList.length > 0 && (
-            <div className="w-full max-w-md mb-6">
-              <div className="flex justify-between text-xs text-slate-400 mb-1">
-                <span>{mode === 'mistakes' ? 'Tiến độ diệt từ khó' : 'Tiến độ vòng này'}</span>
-                <span>{currentIndex}/{activeList.length} từ</span>
-              </div>
-              <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
-                <div className={`h-full bg-gradient-to-r transition-all duration-300 ${mode === 'mistakes' ? 'from-red-500 to-orange-400' : 'from-emerald-500 to-green-400'}`} style={{ width: `${progressPercentage}%` }}></div>
+        {/* TAB 1: FLASHCARD */}
+        {activeTab === 'flashcard' && (
+          <div className="w-full max-w-md flex flex-col items-center">
+            <div onClick={() => setIsFlipped(!isFlipped)} className="w-full h-80 cursor-pointer [perspective:1000px] mb-6">
+              <div className={`relative w-full h-full text-center duration-500 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
+                <div className="absolute inset-0 w-full h-full rounded-2xl bg-slate-800 border border-slate-700 shadow-2xl flex flex-col items-center justify-center p-6 [backface-visibility:hidden]">
+                  <div className="flex items-center gap-3"><h2 className="text-4xl font-black">{currentVocab?.word}</h2><button onClick={(e) => speakWord(e, currentVocab?.word)} className="bg-slate-700 p-2 rounded-full text-sm">🔊</button></div>
+                  <p className="text-slate-400 italic mt-2">{currentVocab?.ipa}</p>
+                </div>
+                <div className="absolute inset-0 w-full h-full rounded-2xl bg-indigo-950 border border-indigo-800 shadow-2xl flex flex-col items-center justify-center p-6 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                  <p className="text-3xl font-bold mb-4">{currentVocab?.meaning}</p>
+                  <p className="text-xs text-slate-400 italic">"{currentVocab?.example}"</p>
+                </div>
               </div>
             </div>
-          )}
-
-          {/* NẾU HỘP TỪ KHÓ TRỐNG MÀ LỠ BẤM VÀO */}
-          {activeList.length === 0 && mode === 'mistakes' && (
-            <div className="text-center py-12 bg-slate-800 rounded-2xl w-full max-w-md p-6 border border-slate-700">
-              <span className="text-5xl block mb-4">🎉</span>
-              <h3 className="text-xl font-bold text-emerald-400">Sạch bóng quân thù!</h3>
-              <p className="text-slate-400 text-sm mt-2">Em đã hoàn thành xuất sắc việc sửa toàn bộ các từ vựng làm sai trước đó.</p>
-              <button onClick={() => setMode('flashcard')} className="mt-6 bg-blue-600 px-5 py-2.5 rounded-xl font-bold text-sm">Quay lại học từ mới</button>
+            <div className={`w-full grid grid-cols-2 gap-4 duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <button onClick={() => handleFlashcardAnswer(false)} className="bg-slate-800 border border-slate-700 py-3.5 rounded-xl font-bold text-red-400">❌ Chưa thuộc</button>
+              <button onClick={() => handleFlashcardAnswer(true)} className="bg-emerald-600 py-3.5 rounded-xl font-bold">✅ Thuộc rồi (+10XP)</button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* HIỂN THỊ NỘI DUNG GAME (CHỈ HIỆN KHI CÓ TỪ ĐỂ HỌC) */}
-          {activeList.length > 0 && (
-            <>
-              {/* CHẾ ĐỘ: FLASHCARD HOẶC ÔN TỪ KHÓ DẠNG LẬT THẺ */}
-              {(mode === 'flashcard' || mode === 'mistakes') && (
-                <div className="w-full max-w-md flex flex-col items-center">
-                  <div onClick={() => setIsFlipped(!isFlipped)} className="w-full h-80 cursor-pointer [perspective:1000px] mb-6">
-                    <div className={`relative w-full h-full text-center duration-500 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-                      <div className="absolute inset-0 w-full h-full rounded-2xl bg-slate-800 border border-slate-700 shadow-2xl flex flex-col items-center justify-center p-6 [backface-visibility:hidden]">
-                        {mode === 'mistakes' && <span className="text-[10px] uppercase font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full mb-3 border border-red-500/20">Cần xử lý gấp ⚠️</span>}
-                        <div className="flex items-center gap-3"><h2 className="text-4xl font-black">{currentVocab.word}</h2><button onClick={(e) => speakWord(e, currentVocab.word)} className="bg-slate-700 p-2 rounded-full text-sm">🔊</button></div>
-                        <p className="text-slate-400 italic mt-2">{currentVocab.ipa}</p>
-                      </div>
-                      <div className="absolute inset-0 w-full h-full rounded-2xl bg-indigo-950 border border-indigo-800 shadow-2xl flex flex-col items-center justify-center p-6 [backface-visibility:hidden] [transform:rotateY(180deg)]">
-                        <p className="text-3xl font-bold mb-4">{currentVocab.meaning}</p>
-                        <p className="text-xs text-slate-400 italic">"{currentVocab.example}"</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`w-full grid grid-cols-2 gap-4 duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    <button onClick={() => handleFlashcardAnswer(false)} className="bg-slate-800 border border-slate-700 py-3 rounded-xl font-bold text-red-400 hover:bg-red-500/5">❌ Chưa thuộc</button>
-                    <button onClick={() => handleFlashcardAnswer(true)} className="bg-emerald-600 py-3 rounded-xl font-bold">{mode === 'mistakes' ? '✨ Đã thuộc (Xóa)' : '✅ Thuộc rồi (+10XP)'}</button>
-                  </div>
-                </div>
+        {/* TAB 2: TRẮC NGHIỆM */}
+        {activeTab === 'quiz' && (
+          <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
+            <div className="text-center mb-6">
+              <div className="flex items-center justify-center gap-2"><h2 className="text-3xl font-black">{currentVocab?.word}</h2><button onClick={(e) => speakWord(e, currentVocab?.word)} className="bg-slate-700 p-1.5 rounded-full text-xs">🔊</button></div>
+            </div>
+            <div className="flex flex-col gap-3">
+              {currentVocab?.options.map((option: string, idx: number) => {
+                let btnBg = "bg-slate-900/60 hover:bg-slate-700 border-slate-700";
+                if (selectedAnswer === option) btnBg = isCorrect ? "bg-emerald-600 border-emerald-500" : "bg-red-600 border-red-500";
+                else if (selectedAnswer && option === currentVocab.meaning) btnBg = "bg-emerald-600 border-emerald-500";
+                return <button key={idx} disabled={selectedAnswer !== null} onClick={() => handleQuizAnswer(option)} className={`w-full text-left p-4 rounded-xl font-medium border transition-all ${btnBg}`}>{option}</button>;
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: ĐIỀN TỪ */}
+        {activeTab === 'typing' && (
+          <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl flex flex-col items-center">
+            <h3 className="text-2xl font-black text-white mb-6 text-center">"{currentVocab?.meaning}"</h3>
+            <form onSubmit={handleTypingSubmit} className="w-full flex flex-col gap-4">
+              <div className="relative">
+                <input type="text" autoFocus value={typedWord} disabled={isTypingCorrect === true} onChange={(e) => setTypedWord(e.target.value)} placeholder="Gõ từ tiếng Anh..." className={`w-full bg-slate-900 border text-white rounded-xl p-4 text-center text-xl font-bold tracking-wide outline-none transition-all ${isTypingCorrect === true ? 'border-emerald-500 bg-emerald-950/20 text-emerald-400' : isTypingCorrect === false ? 'border-red-500 bg-red-950/20 text-red-400' : 'border-slate-700 focus:border-purple-500'}`} />
+                {isTypingCorrect === true && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-emerald-400 font-bold">🎉 Đúng!</span>}
+                {isTypingCorrect === false && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-red-400 font-bold">❌ Sai!</span>}
+              </div>
+              {showHint ? (
+                <div className="text-xs bg-purple-950/40 border border-purple-800/60 p-2.5 rounded-lg text-purple-300 text-center">💡 Bắt đầu bằng: "{currentVocab?.word[0].toUpperCase()}" ({currentVocab?.word.length} chữ cái)</div>
+              ) : (
+                <button type="button" onClick={() => setShowHint(true)} className="text-xs text-slate-400 hover:text-purple-400 self-center">🔍 Hiện gợi ý?</button>
               )}
+              <button type="submit" disabled={!typedWord.trim() || isTypingCorrect === true} className={`w-full font-bold py-3.5 rounded-xl text-sm transition-all ${typedWord.trim() && isTypingCorrect !== true ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-500'}`}>🚀 Kiểm tra kết quả</button>
+            </form>
+          </div>
+        )}
 
-              {/* CHẾ ĐỘ: TRẮC NGHIỆM */}
-              {mode === 'quiz' && (
-                <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
-                  <div className="text-center mb-6">
-                    <div className="flex items-center justify-center gap-2"><h2 className="text-3xl font-black">{currentVocab.word}</h2><button onClick={(e) => speakWord(e, currentVocab.word)} className="bg-slate-700 p-1.5 rounded-full text-xs">🔊</button></div>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    {currentVocab.options.map((option: string, idx: number) => {
-                      let btnBg = "bg-slate-700 hover:bg-slate-600";
-                      if (selectedAnswer === option) btnBg = isCorrect ? "bg-emerald-600" : "bg-red-600";
-                      else if (selectedAnswer && option === currentVocab.meaning) btnBg = "bg-emerald-600";
-                      return <button key={idx} disabled={selectedAnswer !== null} onClick={() => handleQuizAnswer(option)} className={`w-full text-left p-4 rounded-xl font-medium transition-all ${btnBg}`}>{option}</button>;
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* CHẾ ĐỘ: ĐIỀN TỪ */}
-              {mode === 'typing' && (
-                <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl flex flex-col items-center">
-                  <h3 className="text-2xl font-black text-white mb-6 text-center">"{currentVocab.meaning}"</h3>
-                  <form onSubmit={handleTypingSubmit} className="w-full flex flex-col gap-4">
-                    <div className="relative">
-                      <input type="text" autoFocus value={typedWord} disabled={isTypingCorrect === true} onChange={(e) => setTypedWord(e.target.value)} placeholder="Gõ từ tiếng Anh..." className={`w-full bg-slate-900 border text-white rounded-xl p-4 text-center text-xl font-bold tracking-wide outline-none transition-all ${isTypingCorrect === true ? 'border-emerald-500 bg-emerald-950/20 text-emerald-400' : isTypingCorrect === false ? 'border-red-500 bg-red-950/20 text-red-400' : 'border-slate-700 focus:border-purple-500'}`} />
-                      {isTypingCorrect === true && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-emerald-400 font-bold">🎉 Đúng!</span>}
-                      {isTypingCorrect === false && <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-red-400 font-bold">❌ Sai!</span>}
-                    </div>
-                    {showHint ? (
-                      <div className="text-xs bg-purple-950/40 border border-purple-800/60 p-2 rounded-lg text-purple-300 text-center">💡 Bắt đầu bằng: "{currentVocab.word[0].toUpperCase()}" ({currentVocab.word.length} chữ cái)</div>
-                    ) : (
-                      <button type="button" onClick={() => setShowHint(true)} className="text-xs text-slate-400 hover:text-purple-400 self-center">🔍 Hiện gợi ý?</button>
-                    )}
-                    <button type="submit" disabled={!typedWord.trim() || isTypingCorrect === true} className={`w-full font-bold py-3 rounded-xl text-sm transition-all ${typedWord.trim() && isTypingCorrect !== true ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-500'}`}>🚀 Kiểm tra</button>
-                  </form>
-                </div>
-              )}
-            </>
-          )}
-
-        </div>
-
-        {/* ================= CỘT PHẢI: TỔNG QUAN HỒ SƠ CỦA EM TRAI ================= */}
-        <div className="flex flex-col gap-6">
-          
-          {/* KHỐI KINH NGHIỆM */}
-          <div className="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-xl">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thành tích của em</h4>
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">💎</span>
-              <div>
-                <div className="text-2xl font-black text-amber-400">{xp} XP</div>
-                <p className="text-xs text-slate-400">Điểm số tích lũy từ trước tới nay</p>
+        {/* TAB 4: GAME NỐI TỪ */}
+        {activeTab === 'matching' && (
+          <div className="w-full bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
+            <div className="text-center mb-6">
+              <span className="text-xs font-bold uppercase text-teal-400 bg-teal-500/10 px-3 py-1 rounded-full">Thử Thách Ghép Đôi</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2.5">
+                {enCards.map((card) => {
+                  const isMatched = matchedIds.includes(card.id);
+                  const isSelected = selectedEn === card.id;
+                  let btnStyle = "bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-700/50";
+                  if (isMatched) btnStyle = "bg-slate-900/20 border-slate-850 text-slate-600 line-through opacity-30 pointer-events-none";
+                  else if (isSelected) btnStyle = isMatchError ? "bg-red-600 border-red-500 text-white" : "bg-teal-600 border-teal-500 text-white ring-2 ring-teal-400";
+                  return <button key={card.id} onClick={() => handleEnCardClick(card.id)} className={`p-3.5 rounded-xl font-bold border text-center transition-all text-sm ${btnStyle}`}>{card.word}</button>;
+                })}
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {viCards.map((card) => {
+                  const isMatched = matchedIds.includes(card.id);
+                  const isSelected = selectedVi === card.id;
+                  let btnStyle = "bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-700/50";
+                  if (isMatched) btnStyle = "bg-slate-900/20 border-slate-850 text-slate-600 line-through opacity-30 pointer-events-none";
+                  else if (isSelected) btnStyle = isMatchError ? "bg-red-600 border-red-500 text-white" : "bg-teal-600 border-teal-500 text-white ring-2 ring-teal-400";
+                  return <button key={card.id} onClick={() => handleViCardClick(card.id)} className={`p-3.5 rounded-xl font-medium border text-center transition-all text-xs ${btnStyle}`}>{card.meaning}</button>;
+                })}
               </div>
             </div>
           </div>
+        )}
 
-          {/* KHỐI CHI TIẾT DANH SÁCH TỪ KHÓ */}
-          <div className="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-xl">
-            <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-              📋 Danh sách từ hay quên ({difficultWordIds.length})
-            </h3>
+        {/* TAB 5: SỔ TAY */}
+        {activeTab === 'notebook' && (
+          <div className="w-full max-w-md bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl">
+            <h3 className="text-lg font-black text-red-400 mb-2 flex items-center gap-2">📕 Sổ Tay Từ Khó ({difficultWordIds.length})</h3>
+            <p className="text-xs text-slate-400 mb-4">Tổng hợp những từ em từng làm sai. Hãy xóa chúng khi đã thuộc nhé!</p>
             
-            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+            <div className="flex flex-col gap-2.5 max-h-80 overflow-y-auto pr-1">
               {vocabList.filter(item => difficultWordIds.includes(item.id)).map((item) => (
-                <div key={item.id} className="bg-slate-900/60 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center">
+                <div key={item.id} className="bg-slate-900 border border-slate-700/60 p-3 rounded-xl flex justify-between items-center">
                   <div>
-                    <span className="font-bold text-sm text-white block">{item.word}</span>
-                    <span className="text-slate-400 text-xs">{item.meaning}</span>
+                    <span className="font-bold text-sm text-white flex items-center gap-2">{item.word} <span className="text-[10px] text-slate-500 font-normal">{item.ipa}</span></span>
+                    <span className="text-emerald-400 text-xs mt-0.5 block">{item.meaning}</span>
                   </div>
-                  <span className="text-xs">⚠️</span>
+                  <button onClick={() => removeDifficultWordDirectly(item.id)} className="bg-emerald-500/10 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-emerald-500/20 transition-all">
+                    ✓ Đã thuộc
+                  </button>
                 </div>
               ))}
               {difficultWordIds.length === 0 && (
-                <p className="text-slate-500 text-xs italic text-center py-4">Chưa có từ nào bị liệt vào danh sách đen. Quá giỏi!</p>
+                <div className="text-center py-8">
+                  <span className="text-4xl block mb-2">⭐</span>
+                  <p className="text-slate-500 text-xs italic">Sổ tay trống trơn. Em không có từ sai nào cả, tuyệt vời!</p>
+                </div>
               )}
             </div>
           </div>
-
-        </div>
+        )}
 
       </div>
+
+      {/* ================= 🌟 THANH ĐIỀU HƯỚNG ĐÃ ĐƯỢC PHÓNG TO CHỮ & ICON 🌟 ================= */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-850/95 border-t border-slate-800 backdrop-blur-md py-3 px-2 flex justify-around items-center z-50 max-w-2xl mx-auto md:rounded-t-2xl md:bottom-4 md:border shadow-2xl">
+        
+        <button onClick={() => setActiveTab('flashcard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'flashcard' ? 'text-blue-500 scale-105 font-bold' : 'text-slate-400'}`}>
+          <span className="text-2xl">📇</span>
+          <span className="text-xs">Flashcard</span>
+        </button>
+
+        <button onClick={() => setActiveTab('quiz')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'quiz' ? 'text-orange-500 scale-105 font-bold' : 'text-slate-400'}`}>
+          <span className="text-2xl">🎮</span>
+          <span className="text-xs">Trắc Nghiệm</span>
+        </button>
+
+        <button onClick={() => setActiveTab('typing')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'typing' ? 'text-purple-500 scale-105 font-bold' : 'text-slate-400'}`}>
+          <span className="text-2xl">⌨️</span>
+          <span className="text-xs">Điền Từ</span>
+        </button>
+
+        <button onClick={() => setActiveTab('matching')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'matching' ? 'text-teal-500 scale-105 font-bold' : 'text-slate-400'}`}>
+          <span className="text-2xl">🔗</span>
+          <span className="text-xs">Nối Từ</span>
+        </button>
+
+        <button onClick={() => setActiveTab('notebook')} className={`flex flex-col items-center gap-1 transition-all relative ${activeTab === 'notebook' ? 'text-red-500 scale-105 font-bold' : 'text-slate-400'}`}>
+          {difficultWordIds.length > 0 && (
+            <span className="absolute -top-1.5 -right-2 bg-red-600 text-white text-[9px] font-bold w-4.5 h-4.5 rounded-full flex items-center justify-center animate-pulse border border-slate-900">
+              {difficultWordIds.length}
+            </span>
+          )}
+          <span className="text-2xl">📕</span>
+          <span className="text-xs">Sổ Tay</span>
+        </button>
+
+      </div>
+
     </main>
   );
 }
