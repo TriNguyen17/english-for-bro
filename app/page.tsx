@@ -129,6 +129,23 @@ export default function Home() {
     }
   };
 
+  // --- CÁC HÀM XỬ LÝ CLICK NỐI TỪ (ĐÃ ĐƯỢC BỔ SUNG ĐẦY ĐỦ) ---
+  const handleEnCardClick = (id: number) => {
+    if (matchedIds.includes(id) || isMatchError) return;
+    setSelectedEn(id);
+    if (selectedVi !== null) {
+      checkMatch(id, selectedVi);
+    }
+  };
+
+  const handleViCardClick = (id: number) => {
+    if (matchedIds.includes(id) || isMatchError) return;
+    setSelectedVi(id);
+    if (selectedEn !== null) {
+      checkMatch(selectedEn, id);
+    }
+  };
+
   const checkMatch = (enId: number, viId: number) => {
     if (enId === viId) {
       const newMatched = [...matchedIds, enId];
@@ -312,7 +329,7 @@ export default function Home() {
 
       </div>
 
-      {/* ================= 🌟 THANH ĐIỀU HƯỚNG ĐÃ ĐƯỢC PHÓNG TO CHỮ & ICON 🌟 ================= */}
+      {/* THANH ĐIỀU HƯỚNG ĐÁY */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-850/95 border-t border-slate-800 backdrop-blur-md py-3 px-2 flex justify-around items-center z-50 max-w-2xl mx-auto md:rounded-t-2xl md:bottom-4 md:border shadow-2xl">
         
         <button onClick={() => setActiveTab('flashcard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'flashcard' ? 'text-blue-500 scale-105 font-bold' : 'text-slate-400'}`}>
